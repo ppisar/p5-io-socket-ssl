@@ -71,6 +71,13 @@ if ( $pid == 0 ) {
 
 	$client->verify_hostname($host,'http') or print "not ";
 	print "ok # client verify hostname in cert $host\n";
+
+	if ($client) {
+	    # Shutdown TLS properly. Otherwise TLSv1.3 server will receive SIGPIPE
+	    # in SSL_accept() and dies.
+	    # <https://github.com/openssl/openssl/issues/6904>.
+	    $client->close('SSL_fast_shutdown' => 0);
+	}
     }
     exit;
 }
@@ -81,5 +88,8 @@ for my $host (@tests) {
     my $name = $csock->get_servername;
     print "not " if ! $name or $name ne $host;
     print "ok # server got SNI name $host\n";
+    if ($csock) {
+        $csock->close('SSL_fast_shutdown' => 0);
+    }
 }
 wait;
