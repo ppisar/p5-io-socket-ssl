@@ -2391,6 +2391,10 @@ sub new {
 	# There is no CTX_tlsv1_3_new(). Create TLSv1.3 only context using
 	# a flexible method.
 	if ($ver eq 'TLSv1_3') {
+	    if (!eval {Net::SSLeay::TLS1_3_VERSION()}) {
+		return IO::Socket::SSL->_internal_error(
+		    "SSL Version $ver not supported",9);
+	    }
 	    if (!Net::SSLeay::CTX_set_min_proto_version($ctx,
 		    Net::SSLeay::TLS1_3_VERSION()) or
 		!Net::SSLeay::CTX_set_max_proto_version($ctx,
