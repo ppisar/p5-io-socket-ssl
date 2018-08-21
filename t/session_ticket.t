@@ -69,7 +69,7 @@ my $client = sub {
     diag("connect to $i: ".
 	($cl ? "success reuse=$reuse" : "error: $!,$SSL_ERROR"));
     is($reuse,$expect_reuse,$desc);
-    close($cl);
+    $cl->close('SSL_fast_shutdown' => 0);
 };
 
 
@@ -123,6 +123,11 @@ sub _server {
 	    SSL_verify_mode => SSL_VERIFY_PEER|SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
 	    SSL_ticket_keycb => $get_ticket_key,
 	    SSL_session_id_context => 'foobar',
+	    SSL_version => 'SSLv23:!TLSv1_3', # TLSv1.3 sends session tickes after
+		# a handshake, this SSL_get1_session() is not reliable anymore.
+		# Exclude TLSv1.3 from tests. Proper TLSv1.3 session resumption
+		# will need SSL_CTX_sess_set_new_cb().
+		# <https://www.openssl.org/blog/blog/2017/05/04/tlsv1.3/>
 	) or die "failed to create SSL context: $SSL_ERROR";
     }
 
@@ -158,7 +163,7 @@ sub _server {
 		print "rotate secrets\n";
 		push @secrets, shift(@secrets);
 	    }
-	    close($cl);
+	    $cl->close('SSL_fast_shutdown' => 0);
 	    alarm(0);
 	    last;
 	}
