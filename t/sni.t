@@ -68,15 +68,31 @@ if ( $pid == 0 ) {
 
 	$client->verify_hostname($host,'http') or print "not ";
 	print "ok # client verify hostname in cert $host\n";
+	# Shutdown TLS properly. Otherwise TLSv1.3 $server->accept() fails with
+	# ECONNRESET when a client disconnects too early.
+	$client->close('SSL_fast_shutdown' => 0);
     }
     exit;
 }
 
+# If the server dies, a client can get stuck in read(2) while Perl interpreter
+# is collecting children status in the die handler using wait4(2).
+$SIG{__DIE__} = sub {
+    STDERR->print("Server died. Killing client with $pid PID.\n");
+    kill(9, $pid);
+};
 for my $host (@tests) {
-    my $csock = $server->accept or print "not ";
-    print "ok # server accept\n";
+    my $csock = $server->accept;
+    if (!$csock) {
+        print "not ok # server accept SSL_ERROR='$SSL_ERROR', errno='$!'";
+    } else {
+        print "ok # server accept\n";
+    }
     my $name = $csock->get_servername;
     print "not " if ! $name or $name ne $host;
     print "ok # server got SNI name $host\n";
+    # Shutdown TLS properly. Otherwise TLSv1.3 $server->accept() fails with
+    # ECONNRESET when a client disconnects too early.
+    $csock->close('SSL_fast_shutdown' => 0);
 }
 wait;
